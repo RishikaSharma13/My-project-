@@ -3,9 +3,11 @@ pipeline {
 
     environment {
         VENV = "venv"
+        IMAGE_NAME = "my-flask-app"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'main',
@@ -35,47 +37,6 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t my-flask-app .'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                sh '''
-                docker stop my-flask-app || true
-                docker rm my-flask-app || true
-                docker run -d -p 5000:5000 --name my-flask-app my-flask-app
-                '''
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "CI/CD Pipeline completed successfully!"
-        }
-        failure {
-            echo "CI/CD Pipeline failed!"
-        }
-    }
-}
-pipeline {
-    agent any
-
-    environment {
-        IMAGE_NAME = "rishikas13/image-sketch-app:latest"
-    }
-
-    stages {
-
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: 'https://github.com/RishikaSharma13/My-project.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
                 sh '''
                 docker build -t $IMAGE_NAME .
                 '''
@@ -93,10 +54,12 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Deploy') {
             steps {
                 sh '''
-                docker push $IMAGE_NAME
+                docker stop $IMAGE_NAME || true
+                docker rm $IMAGE_NAME || true
+                docker run -d -p 5000:5000 --name $IMAGE_NAME $IMAGE_NAME
                 '''
             }
         }
@@ -114,13 +77,12 @@ pipeline {
             archiveArtifacts artifacts: 'trivy-report.html', fingerprint: true
         }
 
-        failure {
-            echo '❌ Build failed due to high/critical vulnerabilities.'
+        success {
+            echo " CI/CD Pipeline completed successfully!"
         }
 
-        success {
-            echo '✅ Image scanned successfully. No critical vulnerabilities found.'
+        failure {
+            echo "CI/CD Pipeline failed!"
         }
     }
 }
-
