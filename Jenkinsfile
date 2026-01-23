@@ -59,3 +59,68 @@ pipeline {
         }
     }
 }
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "rishikas13/image-sketch-app:latest"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/RishikaSharma13/My-project.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t $IMAGE_NAME .
+                '''
+            }
+        }
+
+        stage('Trivy Vulnerability Scan') {
+            steps {
+                sh '''
+                trivy image \
+                --exit-code 1 \
+                --severity HIGH,CRITICAL \
+                $IMAGE_NAME
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh '''
+                docker push $IMAGE_NAME
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+            trivy image \
+            --format template \
+            --template "@html.tpl" \
+            --output trivy-report.html \
+            $IMAGE_NAME
+            '''
+            archiveArtifacts artifacts: 'trivy-report.html', fingerprint: true
+        }
+
+        failure {
+            echo '❌ Build failed due to high/critical vulnerabilities.'
+        }
+
+        success {
+            echo '✅ Image scanned successfully. No critical vulnerabilities found.'
+        }
+    }
+}
+
