@@ -159,6 +159,3 @@ real-world integration of **DevOps, Cloud, and Cyber Security** practices.
 
 **Rishika Sharma**
 PG-DITISS Final Project
-
-
-Just tell me — we’ll finish your **full placement-ready project package**.
