@@ -1,27 +1,67 @@
+import logging
 import os
 
 import cv2
 import numpy as np
+from dotenv import load_dotenv
 from flask import Flask, request, render_template
 from werkzeug.utils import secure_filename
 
+# ---------------------------------------------------
+# Load Environment Variables
+# ---------------------------------------------------
+load_dotenv()
+
+# ---------------------------------------------------
+# Logging Configuration
+# ---------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------
 # Configuration
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
+# ---------------------------------------------------
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+UPLOAD_FOLDER = os.getenv(
+    "UPLOAD_FOLDER",
+    os.path.join(BASE_DIR, "static", "uploads")
+)
+
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+PORT = int(os.getenv("PORT", 4000))
+
+DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# ---------------------------------------------------
+# Flask App
+# ---------------------------------------------------
+
 app = Flask(__name__)
+
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.secret_key = "secret key"
+app.config["SECRET_KEY"] = SECRET_KEY
 
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-# ✅ Improved Ultra-Realistic Pencil Sketch
+# ---------------------------------------------------
+# Sketch Generator
+# ---------------------------------------------------
+
 def make_sketch(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     smooth = cv2.bilateralFilter(gray, 9, 90, 90)
@@ -32,15 +72,17 @@ def make_sketch(img):
     shading = cv2.divide(smooth, 255 - blur, scale=250)
     final = cv2.multiply(shading, edges, scale=1 / 255)
 
-    # Fix: Convert float to uint8 for correct saving
     final = cv2.normalize(final, None, 0, 255, cv2.NORM_MINMAX)
     final = final.astype(np.uint8)
+
     return final
 
 
-# ✅ Clean Cartoon Effect
+# ---------------------------------------------------
+# Cartoon Generator
+# ---------------------------------------------------
+
 def make_cartoon(img):
-    # Smooth colouring
     color = cv2.bilateralFilter(img, d=9, sigmaColor=200, sigmaSpace=200)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -55,13 +97,16 @@ def make_cartoon(img):
         C=2,
     )
 
-    # Convert edges to 3 channel
     edges_3c = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
 
     cartoon = cv2.bitwise_and(color, edges_3c)
 
     return cartoon
 
+
+# ---------------------------------------------------
+# Routes
+# ---------------------------------------------------
 
 @app.route("/", methods=["GET"])
 def home():
@@ -70,51 +115,88 @@ def home():
 
 @app.route("/sketch", methods=["POST"])
 def sketch():
+
     if "file" not in request.files:
+        logger.warning("No file part in request")
         return "No file part", 400
 
     file = request.files["file"]
 
     if file.filename == "":
+        logger.warning("No file selected")
         return "No file selected", 400
 
     if file and allowed_file(file.filename):
 
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(file_path)
+        try:
 
-        img = cv2.imread(file_path)
-        if img is None:
-            return "Image read error", 400
+            filename = secure_filename(file.filename)
 
-        # Generate SKETCH
-        sketch_img = make_sketch(img)
-        sketch_img_name = f"{os.path.splitext(filename)[0]}_sketch.jpg"
-        cv2.imwrite(os.path.join(app.config["UPLOAD_FOLDER"], sketch_img_name), sketch_img)
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
 
-        # Generate CARTOON
-        cartoon_img = make_cartoon(img)
-        cartoon_img_name = f"{os.path.splitext(filename)[0]}_cartoon.jpg"
-        cv2.imwrite(os.path.join(app.config["UPLOAD_FOLDER"], cartoon_img_name), cartoon_img)
+            file.save(file_path)
 
-        return render_template(
-            "home.html",
-            org_img_name=filename,
-            sketch_img_name=sketch_img_name,
-            cartoon_img_name=cartoon_img_name,
-        )
+            img = cv2.imread(file_path)
 
+            if img is None:
+                logger.error("Unable to read uploaded image")
+                return "Image read error", 400
+
+            sketch_img = make_sketch(img)
+
+            sketch_img_name = f"{os.path.splitext(filename)[0]}_sketch.jpg"
+
+            cv2.imwrite(
+                os.path.join(app.config["UPLOAD_FOLDER"], sketch_img_name),
+                sketch_img,
+            )
+
+            cartoon_img = make_cartoon(img)
+
+            cartoon_img_name = f"{os.path.splitext(filename)[0]}_cartoon.jpg"
+
+            cv2.imwrite(
+                os.path.join(app.config["UPLOAD_FOLDER"], cartoon_img_name),
+                cartoon_img,
+            )
+
+            logger.info(f"Successfully processed {filename}")
+
+            return render_template(
+                "home.html",
+                org_img_name=filename,
+                sketch_img_name=sketch_img_name,
+                cartoon_img_name=cartoon_img_name,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error processing image: {e}")
+            return "Internal Server Error", 500
+
+    logger.warning("Invalid file type uploaded")
     return "Invalid file type", 400
+
 
 @app.route("/health", methods=["GET"])
 def health():
+
     return {
         "status": "UP",
         "application": "Image-to-Sketch",
-        "version": "1.0"
+        "version": "1.0",
     }, 200
 
 
+# ---------------------------------------------------
+# Run Application
+# ---------------------------------------------------
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=4000, debug=True)
+
+    logger.info(f"Application started on port {PORT}")
+
+    app.run(
+        host="0.0.0.0",
+        port=PORT,
+        debug=DEBUG,
+    )
