@@ -5,6 +5,7 @@ pipeline {
         IMAGE_NAME = "image-to-sketch"
         AWS_REGION = "ap-south-1"
         ECR_REPO = "150619449649.dkr.ecr.ap-south-1.amazonaws.com/image-to-sketch"
+        SCANNER_HOME = tool 'SonarScanner'
     }
 
     stages {
@@ -13,6 +14,24 @@ pipeline {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/RishikaSharma13/My-project-.git'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
@@ -58,8 +77,6 @@ pipeline {
             }
         }
 
-      
-
         stage('Health Check') {
             steps {
                 sh '''
@@ -73,7 +90,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline v2 completed successfully!'
+            echo 'Pipeline completed successfully!'
         }
 
         failure {
