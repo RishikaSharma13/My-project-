@@ -1,1 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtual Environment
+venv/
+
+# Environment Variables
 .env
+
+# Uploaded/generated images
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Docker
+*.tar
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
