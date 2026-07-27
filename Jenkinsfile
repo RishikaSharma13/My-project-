@@ -41,6 +41,32 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                cd /opt/image-to-sketch
+
+                docker compose pull
+
+                docker compose up -d --remove-orphans
+
+                docker image prune -f
+                '''
+            }
+        }
+
+      
+
+        stage('Health Check') {
+            steps {
+                sh '''
+                sleep 10
+
+                curl -f http://localhost:4000/health
+                '''
+            }
+        }
     }
 
     post {
