@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         IMAGE_NAME = "image-to-sketch"
+        AWS_REGION = "ap-south-1"
+        ECR_REPO = "150619449649.dkr.ecr.ap-south-1.amazonaws.com/image-to-sketch"
     }
 
     stages {
@@ -21,15 +23,33 @@ pipeline {
                 '''
             }
         }
+
+        stage('Login to Amazon ECR') {
+            steps {
+                sh '''
+                aws ecr get-login-password --region $AWS_REGION | \
+                docker login --username AWS --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
+                '''
+            }
+        }
+
+        stage('Push Image to Amazon ECR') {
+            steps {
+                sh '''
+                docker tag $IMAGE_NAME:latest $ECR_REPO:latest
+                docker push $ECR_REPO:latest
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo "Docker image built successfully."
+            echo 'Pipeline v2 completed successfully!'
         }
 
         failure {
-            echo "Pipeline failed."
+            echo 'Pipeline failed!'
         }
     }
 }
