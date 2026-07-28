@@ -55,6 +55,8 @@ pipeline {
         stage('Trivy Image Scan') {
             steps {
                 sh '''
+                mkdir -p reports
+
                 echo "========================================="
                 echo "Running Trivy Security Scan..."
                 echo "========================================="
@@ -63,7 +65,7 @@ pipeline {
                 trivy image \
                   --severity HIGH,CRITICAL \
                   --format table \
-                  --output trivy-report.txt \
+                  --output reports/trivy-report.txt \
                   $IMAGE_NAME:latest
 
                 # Generate HTML Report
@@ -71,12 +73,12 @@ pipeline {
                   --severity HIGH,CRITICAL \
                   --format template \
                   --template "@${TRIVY_TEMPLATE}" \
-                  --output trivy-report.html \
+                  --output reports/trivy-report.html \
                   $IMAGE_NAME:latest
 
                 echo ""
                 echo "========== Trivy Scan Summary =========="
-                cat trivy-report.txt
+                cat reports/trivy-report.txt
                 echo "========================================"
                 '''
             }
@@ -156,7 +158,7 @@ pipeline {
     post {
 
         always {
-            archiveArtifacts artifacts: 'trivy-report.txt, trivy-report.html', fingerprint: true
+            archiveArtifacts artifacts: 'reports/*', fingerprint: true
         }
 
         success {
