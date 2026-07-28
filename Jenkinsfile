@@ -6,6 +6,7 @@ pipeline {
         AWS_REGION = "ap-south-1"
         ECR_REPO = "150619449649.dkr.ecr.ap-south-1.amazonaws.com/image-to-sketch"
         SCANNER_HOME = tool 'SonarScanner'
+        TRIVY_TEMPLATE = "trivy/html.tpl"
     }
 
     stages {
@@ -39,6 +40,36 @@ pipeline {
             steps {
                 sh '''
                 docker build -t $IMAGE_NAME .
+                '''
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                echo "========================================="
+                echo "Running Trivy Security Scan..."
+                echo "========================================="
+
+                # Generate Text Report
+                trivy image \
+                  --severity HIGH,CRITICAL \
+                  --format table \
+                  --output trivy-report.txt \
+                  $IMAGE_NAME:latest
+
+                # Generate HTML Report
+                trivy image \
+                  --severity HIGH,CRITICAL \
+                  --format template \
+                  --template "@${TRIVY_TEMPLATE}" \
+                  --output trivy-report.html \
+                  $IMAGE_NAME:latest
+
+                echo ""
+                echo "========== Trivy Scan Summary =========="
+                cat trivy-report.txt
+                echo "========================================"
                 '''
             }
         }
@@ -89,6 +120,11 @@ pipeline {
     }
 
     post {
+
+        always {
+            archiveArtifacts artifacts: 'trivy-report.txt, trivy-report.html', fingerprint: true
+        }
+
         success {
             echo 'Pipeline completed successfully!'
         }
