@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(
+            name: 'FAIL_ON_VULNERABILITIES',
+            defaultValue: false,
+            description: 'Fail the pipeline if CRITICAL vulnerabilities are found'
+        )
+    }
+
     environment {
         IMAGE_NAME = "image-to-sketch"
         AWS_REGION = "ap-south-1"
@@ -71,6 +79,32 @@ pipeline {
                 cat trivy-report.txt
                 echo "========================================"
                 '''
+            }
+        }
+
+        stage('Security Policy Check') {
+            steps {
+                script {
+
+                    if (params.FAIL_ON_VULNERABILITIES) {
+
+                        echo "Security policy enabled."
+                        echo "Pipeline will fail if CRITICAL vulnerabilities are found."
+
+                        sh '''
+                        trivy image \
+                          --severity CRITICAL \
+                          --exit-code 1 \
+                          $IMAGE_NAME:latest
+                        '''
+
+                    } else {
+
+                        echo "Security policy disabled."
+                        echo "Pipeline will continue even if vulnerabilities exist."
+
+                    }
+                }
             }
         }
 
