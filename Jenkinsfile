@@ -2,10 +2,17 @@ pipeline {
     agent any
 
     parameters {
+
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'prod'],
+            description: 'Select deployment environment'
+        )
+
         booleanParam(
             name: 'FAIL_ON_VULNERABILITIES',
             defaultValue: false,
-            description: 'Fail the pipeline if CRITICAL vulnerabilities are found'
+            description: 'Fail pipeline if CRITICAL vulnerabilities are found'
         )
     }
 
@@ -23,6 +30,20 @@ pipeline {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/RishikaSharma13/My-project-.git'
+            }
+        }
+
+        stage('Pipeline Configuration') {
+            steps {
+                script {
+
+                    echo "=================================="
+                    echo "Pipeline Configuration"
+                    echo "Environment              : ${params.ENVIRONMENT}"
+                    echo "Fail On Vulnerabilities  : ${params.FAIL_ON_VULNERABILITIES}"
+                    echo "=================================="
+
+                }
             }
         }
 
