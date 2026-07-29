@@ -20,8 +20,12 @@ pipeline {
         IMAGE_NAME = "image-to-sketch"
         AWS_REGION = "ap-south-1"
         ECR_REPO = "150619449649.dkr.ecr.ap-south-1.amazonaws.com/image-to-sketch"
+
         SCANNER_HOME = tool 'SonarScanner'
+
         TRIVY_TEMPLATE = "trivy/html.tpl"
+
+        BUILD_IMAGE_TAG = "build-${BUILD_NUMBER}"
     }
 
     stages {
@@ -41,6 +45,7 @@ pipeline {
                     echo "Pipeline Configuration"
                     echo "Environment              : ${params.ENVIRONMENT}"
                     echo "Fail On Vulnerabilities  : ${params.FAIL_ON_VULNERABILITIES}"
+                    echo "Build Tag                : ${BUILD_IMAGE_TAG}"
                     echo "=================================="
 
                 }
@@ -55,13 +60,13 @@ pipeline {
 
                     if (params.ENVIRONMENT == 'dev') {
 
-                        env.IMAGE_TAG = "dev"
+                        env.LATEST_TAG = "latest-dev"
                         env.COMPOSE_FILE = "docker-compose.dev.yml"
                         env.APP_PORT = "4001"
 
                     } else {
 
-                        env.IMAGE_TAG = "prod"
+                        env.LATEST_TAG = "latest-prod"
                         env.COMPOSE_FILE = "docker-compose.prod.yml"
                         env.APP_PORT = "4000"
 
@@ -69,10 +74,11 @@ pipeline {
 
                     echo "=================================="
                     echo "Environment Variables"
-                    echo "IMAGE_TAG    : ${env.IMAGE_TAG}"
-                    echo "DEPLOY_PATH  : ${env.DEPLOY_PATH}"
-                    echo "COMPOSE_FILE : ${env.COMPOSE_FILE}"
-                    echo "APP_PORT     : ${env.APP_PORT}"
+                    echo "BUILD TAG     : ${BUILD_IMAGE_TAG}"
+                    echo "LATEST TAG    : ${LATEST_TAG}"
+                    echo "DEPLOY_PATH   : ${DEPLOY_PATH}"
+                    echo "COMPOSE_FILE  : ${COMPOSE_FILE}"
+                    echo "APP_PORT      : ${APP_PORT}"
                     echo "=================================="
                 }
             }
@@ -99,7 +105,17 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                echo "Building Docker Image..."
+
+                docker build -t $IMAGE_NAME:$BUILD_IMAGE_TAG .
+
+                echo "Creating latest tag..."
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $IMAGE_NAME:$LATEST_TAG
+
+                docker images | grep $IMAGE_NAME
                 '''
             }
         }
@@ -117,18 +133,20 @@ pipeline {
                   --severity HIGH,CRITICAL \
                   --format table \
                   --output reports/trivy-report.txt \
-                  $IMAGE_NAME:$IMAGE_TAG
+                  $IMAGE_NAME:$BUILD_IMAGE_TAG
 
                 trivy image \
                   --severity HIGH,CRITICAL \
                   --format template \
                   --template "@${TRIVY_TEMPLATE}" \
                   --output reports/trivy-report.html \
-                  $IMAGE_NAME:$IMAGE_TAG
+                  $IMAGE_NAME:$BUILD_IMAGE_TAG
 
                 echo ""
                 echo "========== Trivy Scan Summary =========="
+
                 cat reports/trivy-report.txt
+
                 echo "========================================"
                 '''
             }
@@ -141,21 +159,19 @@ pipeline {
                     if (params.FAIL_ON_VULNERABILITIES) {
 
                         echo "Security policy enabled."
-                        echo "Pipeline will fail if CRITICAL vulnerabilities are found."
 
                         sh '''
                         trivy image \
                           --severity CRITICAL \
                           --exit-code 1 \
-                          $IMAGE_NAME:$IMAGE_TAG
+                          $IMAGE_NAME:$BUILD_IMAGE_TAG
                         '''
 
                     } else {
 
                         echo "Security policy disabled."
-                        echo "Pipeline will continue even if vulnerabilities exist."
-
                     }
+
                 }
             }
         }
@@ -164,7 +180,9 @@ pipeline {
             steps {
                 sh '''
                 aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
+                docker login \
+                --username AWS \
+                --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
                 '''
             }
         }
@@ -172,8 +190,25 @@ pipeline {
         stage('Push Image to Amazon ECR') {
             steps {
                 sh '''
-                docker tag $IMAGE_NAME:$IMAGE_TAG $ECR_REPO:$IMAGE_TAG
-                docker push $ECR_REPO:$IMAGE_TAG
+                echo "Pushing immutable image..."
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $ECR_REPO:$BUILD_IMAGE_TAG
+
+                docker push \
+                    $ECR_REPO:$BUILD_IMAGE_TAG
+
+                echo "Updating latest environment tag..."
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $ECR_REPO:$LATEST_TAG
+
+                docker push \
+                    $ECR_REPO:$LATEST_TAG
+
+                echo "Images pushed successfully."
                 '''
             }
         }
@@ -212,11 +247,11 @@ pipeline {
         }
 
         success {
-            echo 'Pipeline completed successfully!'
+            echo "Pipeline completed successfully!"
         }
 
         failure {
-            echo 'Pipeline failed!'
+            echo "Pipeline failed!"
         }
     }
 }
