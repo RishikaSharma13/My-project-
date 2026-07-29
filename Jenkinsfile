@@ -47,6 +47,37 @@ pipeline {
             }
         }
 
+        stage('Set Environment Variables') {
+            steps {
+                script {
+
+                    env.DEPLOY_PATH = "/opt/image-to-sketch"
+
+                    if (params.ENVIRONMENT == 'dev') {
+
+                        env.IMAGE_TAG = "dev"
+                        env.COMPOSE_FILE = "docker-compose.dev.yml"
+                        env.APP_PORT = "4001"
+
+                    } else {
+
+                        env.IMAGE_TAG = "prod"
+                        env.COMPOSE_FILE = "docker-compose.prod.yml"
+                        env.APP_PORT = "4000"
+
+                    }
+
+                    echo "=================================="
+                    echo "Environment Variables"
+                    echo "IMAGE_TAG    : ${env.IMAGE_TAG}"
+                    echo "DEPLOY_PATH  : ${env.DEPLOY_PATH}"
+                    echo "COMPOSE_FILE : ${env.COMPOSE_FILE}"
+                    echo "APP_PORT     : ${env.APP_PORT}"
+                    echo "=================================="
+                }
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -68,7 +99,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                docker build -t $IMAGE_NAME .
+                docker build -t $IMAGE_NAME:$IMAGE_TAG .
                 '''
             }
         }
@@ -82,20 +113,18 @@ pipeline {
                 echo "Running Trivy Security Scan..."
                 echo "========================================="
 
-                # Generate Text Report
                 trivy image \
                   --severity HIGH,CRITICAL \
                   --format table \
                   --output reports/trivy-report.txt \
-                  $IMAGE_NAME:latest
+                  $IMAGE_NAME:$IMAGE_TAG
 
-                # Generate HTML Report
                 trivy image \
                   --severity HIGH,CRITICAL \
                   --format template \
                   --template "@${TRIVY_TEMPLATE}" \
                   --output reports/trivy-report.html \
-                  $IMAGE_NAME:latest
+                  $IMAGE_NAME:$IMAGE_TAG
 
                 echo ""
                 echo "========== Trivy Scan Summary =========="
@@ -118,7 +147,7 @@ pipeline {
                         trivy image \
                           --severity CRITICAL \
                           --exit-code 1 \
-                          $IMAGE_NAME:latest
+                          $IMAGE_NAME:$IMAGE_TAG
                         '''
 
                     } else {
@@ -143,8 +172,8 @@ pipeline {
         stage('Push Image to Amazon ECR') {
             steps {
                 sh '''
-                docker tag $IMAGE_NAME:latest $ECR_REPO:latest
-                docker push $ECR_REPO:latest
+                docker tag $IMAGE_NAME:$IMAGE_TAG $ECR_REPO:$IMAGE_TAG
+                docker push $ECR_REPO:$IMAGE_TAG
                 '''
             }
         }
@@ -152,13 +181,13 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                cd /opt/image-to-sketch
+                cd $DEPLOY_PATH
 
-                docker compose pull
+                docker compose -f $COMPOSE_FILE pull
 
-                docker compose down
+                docker compose -f $COMPOSE_FILE down
 
-                docker compose up -d --remove-orphans
+                docker compose -f $COMPOSE_FILE up -d --remove-orphans
 
                 docker image prune -f
                 '''
@@ -167,11 +196,11 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                sh '''
+                sh """
                 sleep 10
 
-                curl -f http://localhost:4000/health
-                '''
+                curl -f http://localhost:${APP_PORT}/health
+                """
             }
         }
     }
