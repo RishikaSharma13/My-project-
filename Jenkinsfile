@@ -3,12 +3,6 @@ pipeline {
 
     parameters {
 
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'prod'],
-            description: 'Select deployment environment'
-        )
-
         booleanParam(
             name: 'FAIL_ON_VULNERABILITIES',
             defaultValue: false,
@@ -44,7 +38,6 @@ pipeline {
                 script {
                     echo "=================================="
                     echo "Pipeline Configuration"
-                    echo "Environment              : ${params.ENVIRONMENT}"
                     echo "Fail On Vulnerabilities  : ${params.FAIL_ON_VULNERABILITIES}"
                     echo "Build Tag                : ${BUILD_IMAGE_TAG}"
                     echo "=================================="
@@ -206,6 +199,15 @@ pipeline {
 
                 curl -f http://localhost:4001/health
                 '''
+            }
+        }
+
+        stage('Manual Approval') {
+            steps {
+                input(
+                    message: 'Development deployment succeeded. Deploy to Production?',
+                    ok: 'Deploy'
+                )
             }
         }
 
