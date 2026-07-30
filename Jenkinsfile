@@ -3,25 +3,23 @@ pipeline {
 
     parameters {
 
+        choice(
+            name: 'ACTION',
+            choices: ['Deploy', 'Rollback'],
+            description: 'Choose pipeline action'
+        )
+
+        string(
+            name: 'ROLLBACK_BUILD',
+            defaultValue: '',
+            description: 'Build number to rollback to (Example: 39)'
+        )
+
         booleanParam(
             name: 'FAIL_ON_VULNERABILITIES',
             defaultValue: false,
             description: 'Fail pipeline if CRITICAL vulnerabilities are found'
         )
-    }
-
-    environment {
-        IMAGE_NAME = "image-to-sketch"
-        AWS_REGION = "ap-south-1"
-        ECR_REPO = "150619449649.dkr.ecr.ap-south-1.amazonaws.com/image-to-sketch"
-
-        SCANNER_HOME = tool 'SonarScanner'
-
-        TRIVY_TEMPLATE = "trivy/html.tpl"
-
-        BUILD_IMAGE_TAG = "build-${BUILD_NUMBER}"
-
-        DEPLOY_PATH = "/opt/image-to-sketch"
     }
 
     stages {
