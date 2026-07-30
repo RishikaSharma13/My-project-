@@ -211,6 +211,29 @@ pipeline {
             }
         }
 
+        stage('Promote Image to Production') {
+            steps {
+                sh '''
+                echo "========================================="
+                echo "Promoting image to Production..."
+                echo "========================================="
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $IMAGE_NAME:latest-prod
+
+                docker tag \
+                    $IMAGE_NAME:latest-prod \
+                    $ECR_REPO:latest-prod
+
+                docker push \
+                    $ECR_REPO:latest-prod
+
+                echo "Production image promoted successfully."
+                '''
+            }
+        }
+
         stage('Deploy Prod') {
             steps {
                 sh '''
