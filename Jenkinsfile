@@ -37,7 +37,7 @@ pipeline {
                     echo "=================================="
                     echo "Pipeline Configuration"
                     echo "Fail On Vulnerabilities  : ${params.FAIL_ON_VULNERABILITIES}"
-                    echo "Build Tag                : ${BUILD_IMAGE_TAG}"
+                    echo "Build Tag : ${env.BUILD_IMAGE_TAG}"
                     echo "=================================="
                 }
             }
