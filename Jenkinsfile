@@ -138,11 +138,26 @@ pipeline {
                 sh '''
                 set -e
 
+                whoami
+                docker buildx ls
+
                 echo "===================================================="
-                echo "Preparing Docker Build Cache..."
+                echo "Preparing Docker Build Environment..."
                 echo "===================================================="
 
+                # Pull latest image (used later when we enable registry cache)
                 docker pull $ECR_REPO:latest-dev || true
+
+                echo ""
+                echo "===================================================="
+                echo "Initializing BuildKit Builder..."
+                echo "===================================================="
+
+                # Create builder if it doesn't exist
+                docker buildx create --name jenkins-builder --driver docker-container --use 2>/dev/null || true
+
+                # Ensure builder is running
+                docker buildx inspect jenkins-builder --bootstrap
 
                 echo ""
                 echo "===================================================="
@@ -150,23 +165,28 @@ pipeline {
                 echo "===================================================="
 
                 docker buildx build \
-                --builder jenkins-builder \
-                --load \
-                -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
-                .
+                    --builder jenkins-builder \
+                    --load \
+                    -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    .
 
                 echo ""
+                echo "===================================================="
                 echo "Creating latest-dev tag..."
+                echo "===================================================="
 
                 docker tag \
                     $IMAGE_NAME:$BUILD_IMAGE_TAG \
                     $IMAGE_NAME:latest-dev
 
                 echo ""
+                echo "===================================================="
                 echo "Available Images"
+                echo "===================================================="
 
                 docker images | grep $IMAGE_NAME
                 '''
+                            
 
             }
 
