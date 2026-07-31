@@ -139,12 +139,21 @@ pipeline {
                 set -e
 
                 echo "===================================================="
+                echo "Preparing Docker Build Cache..."
+                echo "===================================================="
+
+                docker pull $ECR_REPO:latest-dev || true
+
+                echo ""
+                echo "===================================================="
                 echo "Building Docker Image..."
                 echo "===================================================="
 
-                docker build \
-                    -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
-                    .
+                docker buildx build \
+                --builder jenkins-builder \
+                --load \
+                -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                .
 
                 echo ""
                 echo "Creating latest-dev tag..."
