@@ -513,49 +513,53 @@ pipeline {
         stage('Post Build Cleanup') {
 
             when {
-                    expression { params.ACTION == 'Deploy' }
-                }
-
-                steps {
-
-                    sh '''
-                    set -e
-
-                    echo "===================================================="
-                    echo "Cleaning Docker Images and Build Cache..."
-                    echo "===================================================="
-
-                    echo ""
-                    echo "Removing dangling images..."
-
-                    docker image prune -f
-
-                    echo ""
-                    echo "Removing BuildKit cache older than 7 days..."
-
-                    docker builder prune \
-                        -f \
-                        --filter "until=168h"
-
-                    echo ""
-                    echo "Removing old immutable build images..."
-
-                    KEEP=$LOCAL_IMAGE_RETENTION
-
-                    docker images \
-                        --format "{{.Repository}}:{{.Tag}} {{.ID}}" \
-                    | grep "build-" \
-                    | sort -t'-' -k2 -n \
-                    | awk '!seen[$2]++' \
-                    | head -n -$KEEP \
-                    | while read IMAGE IMAGE_ID
-                    do
-                        echo "Removing image: $IMAGE ($IMAGE_ID)"
-                        docker image rm -f "$IMAGE_ID" || true
-                    done
-                }
+                expression { params.ACTION == 'Deploy' }
             }
 
+            steps {
+
+                sh '''
+                set -e
+
+                echo "===================================================="
+                echo "Cleaning Docker Images and Build Cache..."
+                echo "===================================================="
+
+                echo ""
+                echo "Removing dangling images..."
+                docker image prune -f
+
+                echo ""
+                echo "Removing BuildKit cache older than 7 days..."
+                docker builder prune \
+                    -f \
+                    --filter "until=168h"
+
+                echo ""
+                echo "Removing old immutable build images..."
+
+                KEEP=$LOCAL_IMAGE_RETENTION
+
+                docker images \
+                    --format "{{.Repository}}:{{.Tag}} {{.ID}}" \
+                | grep "build-" \
+                | sort -t'-' -k2 -n \
+                | awk '!seen[$2]++' \
+                | head -n -$KEEP \
+                | while read IMAGE IMAGE_ID
+                do
+                    echo "Removing image: $IMAGE ($IMAGE_ID)"
+                    docker image rm -f "$IMAGE_ID" || true
+                done
+
+                echo ""
+                echo "Cleanup completed."
+
+                docker system df
+                '''
+            }
+        }
+        
         stage('Rollback Production') {
 
             when {
