@@ -127,6 +127,36 @@ pipeline {
 
         }
 
+        stage('Login to Amazon ECR') {
+
+            when {
+                expression {
+                    params.ACTION == 'Deploy' ||
+                    params.ACTION == 'Rollback'
+                }
+            }
+
+            steps {
+
+                sh '''
+                set -e
+
+                echo "===================================================="
+                echo "Logging into Amazon ECR..."
+                echo "===================================================="
+
+                aws ecr get-login-password \
+                    --region $AWS_REGION | docker login \
+                    --username AWS \
+                    --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
+
+                echo "Login Successful."
+                '''
+
+            }
+
+        }
+
         stage('Build Docker Image') {
 
             when {
@@ -144,9 +174,6 @@ pipeline {
                 echo "===================================================="
                 echo "Preparing Docker Build Environment..."
                 echo "===================================================="
-
-                # Pull latest image (used later when we enable registry cache)
-                docker pull $ECR_REPO:buildcache || true
 
                 echo ""
                 echo "===================================================="
@@ -167,8 +194,7 @@ pipeline {
                 docker buildx build \
                     --builder jenkins-builder \
                     --load \
-                    --cache-from type=registry,ref=$ECR_REPO:buildcache \
-                    --cache-to type=registry,ref=$ECR_REPO:buildcache,mode=max \
+                    --cache-to type=inline \
                     --progress=plain \
                     -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
                     .
@@ -194,6 +220,50 @@ pipeline {
             }
 
         }
+
+             stage('Push Image to Amazon ECR') {
+
+            when {
+                expression { params.ACTION == 'Deploy' }
+            }
+
+            steps {
+
+                sh '''
+                set -e
+
+                echo "===================================================="
+                echo "Pushing Immutable Image to Amazon ECR"
+                echo "===================================================="
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $ECR_REPO:$BUILD_IMAGE_TAG
+
+                docker push \
+                    $ECR_REPO:$BUILD_IMAGE_TAG
+
+                echo ""
+                echo "Updating latest-dev tag..."
+
+                docker tag \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
+                    $ECR_REPO:latest-dev
+
+                docker push \
+                    $ECR_REPO:latest-dev
+
+                echo ""
+                echo "Immutable Image : $BUILD_IMAGE_TAG"
+                echo "Development Tag : latest-dev"
+
+                echo "Images pushed successfully."
+                '''
+
+            }
+
+        }
+
 
         stage('Trivy Image Scan') {
 
@@ -265,79 +335,6 @@ pipeline {
                     }
 
                 }
-
-            }
-
-        }
-
-        stage('Login to Amazon ECR') {
-
-            when {
-                expression {
-                    params.ACTION == 'Deploy' ||
-                    params.ACTION == 'Rollback'
-                }
-            }
-
-            steps {
-
-                sh '''
-                set -e
-
-                echo "===================================================="
-                echo "Logging into Amazon ECR..."
-                echo "===================================================="
-
-                aws ecr get-login-password \
-                    --region $AWS_REGION | docker login \
-                    --username AWS \
-                    --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
-
-                echo "Login Successful."
-                '''
-
-            }
-
-        }
-
-                stage('Push Image to Amazon ECR') {
-
-            when {
-                expression { params.ACTION == 'Deploy' }
-            }
-
-            steps {
-
-                sh '''
-                set -e
-
-                echo "===================================================="
-                echo "Pushing Immutable Image to Amazon ECR"
-                echo "===================================================="
-
-                docker tag \
-                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
-                    $ECR_REPO:$BUILD_IMAGE_TAG
-
-                docker push \
-                    $ECR_REPO:$BUILD_IMAGE_TAG
-
-                echo ""
-                echo "Updating latest-dev tag..."
-
-                docker tag \
-                    $IMAGE_NAME:$BUILD_IMAGE_TAG \
-                    $ECR_REPO:latest-dev
-
-                docker push \
-                    $ECR_REPO:latest-dev
-
-                echo ""
-                echo "Immutable Image : $BUILD_IMAGE_TAG"
-                echo "Development Tag : latest-dev"
-
-                echo "Images pushed successfully."
-                '''
 
             }
 
