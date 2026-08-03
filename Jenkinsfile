@@ -543,21 +543,16 @@ pipeline {
                     KEEP=$LOCAL_IMAGE_RETENTION
 
                     docker images \
-                        --format "{{.Repository}}:{{.Tag}}" \
+                        --format "{{.Repository}}:{{.Tag}} {{.ID}}" \
                     | grep "build-" \
                     | sort -t'-' -k2 -n \
+                    | awk '!seen[$2]++' \
                     | head -n -$KEEP \
-                    | while read IMAGE
+                    | while read IMAGE IMAGE_ID
                     do
-                        docker image rm "$IMAGE" || true
+                        echo "Removing image: $IMAGE ($IMAGE_ID)"
+                        docker image rm -f "$IMAGE_ID" || true
                     done
-
-                    echo ""
-                    echo "Cleanup completed."
-
-                    docker system df
-
-                    '''
                 }
             }
 
