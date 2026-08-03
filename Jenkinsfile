@@ -20,6 +20,8 @@ pipeline {
 
         BUILD_IMAGE_TAG = "build-${BUILD_NUMBER}"
 
+        LOCAL_IMAGE_RETENTION = '5'
+
     }
 
     parameters {
@@ -508,7 +510,58 @@ pipeline {
 
         }
 
-                stage('Rollback Production') {
+        stage('Post Build Cleanup') {
+
+            when {
+                    expression { params.ACTION == 'Deploy' }
+                }
+
+                steps {
+
+                    sh '''
+                    set -e
+
+                    echo "===================================================="
+                    echo "Cleaning Docker Images and Build Cache..."
+                    echo "===================================================="
+
+                    echo ""
+                    echo "Removing dangling images..."
+
+                    docker image prune -f
+
+                    echo ""
+                    echo "Removing BuildKit cache older than 7 days..."
+
+                    docker builder prune \
+                        -f \
+                        --filter "until=168h"
+
+                    echo ""
+                    echo "Removing old immutable build images..."
+
+                    KEEP=$LOCAL_IMAGE_RETENTION
+
+                    docker images \
+                        --format "{{.Repository}}:{{.Tag}}" \
+                    | grep "build-" \
+                    | sort -t'-' -k2 -n \
+                    | head -n -$KEEP \
+                    | while read IMAGE
+                    do
+                        docker image rm "$IMAGE" || true
+                    done
+
+                    echo ""
+                    echo "Cleanup completed."
+
+                    docker system df
+
+                    '''
+                }
+            }
+
+        stage('Rollback Production') {
 
             when {
                 expression { params.ACTION == 'Rollback' }
