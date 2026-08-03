@@ -146,7 +146,7 @@ pipeline {
                 echo "===================================================="
 
                 # Pull latest image (used later when we enable registry cache)
-                docker pull $ECR_REPO:latest-dev || true
+                docker pull $ECR_REPO:buildcache || true
 
                 echo ""
                 echo "===================================================="
@@ -167,6 +167,9 @@ pipeline {
                 docker buildx build \
                     --builder jenkins-builder \
                     --load \
+                    --cache-from type=registry,ref=$ECR_REPO:buildcache \
+                    --cache-to type=registry,ref=$ECR_REPO:buildcache,mode=max \
+                    --progress=plain \
                     -t $IMAGE_NAME:$BUILD_IMAGE_TAG \
                     .
 
