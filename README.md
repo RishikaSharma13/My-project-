@@ -1445,7 +1445,7 @@ Example image tags:
 Shows the application successfully deployed in the Production environment after manual approval.
 
 <p align="center">
-    <img src="docs/images/prod-deployment.png" alt="Production Deployment" width="1000"/>
+    <img src="docs/images/application.png" alt="Production Deployment" width="1000"/>
 </p>
 
 ---
@@ -1462,7 +1462,7 @@ The screenshot demonstrates:
 - Production Health Check
 
 <p align="center">
-    <img src="docs/images/rollback.png" alt="Rollback" width="1000"/>
+    <img src="docs/images/Rollback.png" alt="Rollback" width="1000"/>
 </p>
 
 ---
