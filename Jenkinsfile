@@ -129,36 +129,6 @@ pipeline {
 
         }
 
-        stage('Login to Amazon ECR') {
-
-            when {
-                expression {
-                    params.ACTION == 'Deploy' ||
-                    params.ACTION == 'Rollback'
-                }
-            }
-
-            steps {
-
-                sh '''
-                set -e
-
-                echo "===================================================="
-                echo "Logging into Amazon ECR..."
-                echo "===================================================="
-
-                aws ecr get-login-password \
-                    --region $AWS_REGION | docker login \
-                    --username AWS \
-                    --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
-
-                echo "Login Successful."
-                '''
-
-            }
-
-        }
-
         stage('Build Docker Image') {
 
             when {
@@ -223,6 +193,79 @@ pipeline {
 
         }
 
+        stage('Trivy Image Scan') {
+
+            when {
+                expression { params.ACTION == 'Deploy' }
+            }
+
+            steps {
+
+                sh '''
+                set -e
+
+                mkdir -p reports
+
+                echo "===================================================="
+                echo "Running Trivy Security Scan..."
+                echo "===================================================="
+
+                trivy image \
+                    --severity HIGH,CRITICAL \
+                    --format table \
+                    --output reports/trivy-report.txt \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG
+
+                trivy image \
+                    --severity HIGH,CRITICAL \
+                    --format template \
+                    --template "@${TRIVY_TEMPLATE}" \
+                    --output reports/trivy-report.html \
+                    $IMAGE_NAME:$BUILD_IMAGE_TAG
+
+                echo ""
+                echo "============== Scan Summary =============="
+
+                cat reports/trivy-report.txt
+
+                echo "=========================================="
+                '''
+
+            }
+
+        }
+
+        stage('Login to Amazon ECR') {
+
+            when {
+                expression {
+                    params.ACTION == 'Deploy' ||
+                    params.ACTION == 'Rollback'
+                }
+            }
+
+            steps {
+
+                sh '''
+                set -e
+
+                echo "===================================================="
+                echo "Logging into Amazon ECR..."
+                echo "===================================================="
+
+                aws ecr get-login-password \
+                    --region $AWS_REGION | docker login \
+                    --username AWS \
+                    --password-stdin 150619449649.dkr.ecr.ap-south-1.amazonaws.com
+
+                echo "Login Successful."
+                '''
+
+            }
+
+        }
+
+
              stage('Push Image to Amazon ECR') {
 
             when {
@@ -266,48 +309,6 @@ pipeline {
 
         }
 
-
-        stage('Trivy Image Scan') {
-
-            when {
-                expression { params.ACTION == 'Deploy' }
-            }
-
-            steps {
-
-                sh '''
-                set -e
-
-                mkdir -p reports
-
-                echo "===================================================="
-                echo "Running Trivy Security Scan..."
-                echo "===================================================="
-
-                trivy image \
-                    --severity HIGH,CRITICAL \
-                    --format table \
-                    --output reports/trivy-report.txt \
-                    $IMAGE_NAME:$BUILD_IMAGE_TAG
-
-                trivy image \
-                    --severity HIGH,CRITICAL \
-                    --format template \
-                    --template "@${TRIVY_TEMPLATE}" \
-                    --output reports/trivy-report.html \
-                    $IMAGE_NAME:$BUILD_IMAGE_TAG
-
-                echo ""
-                echo "============== Scan Summary =============="
-
-                cat reports/trivy-report.txt
-
-                echo "=========================================="
-                '''
-
-            }
-
-        }
 
         stage('Security Policy Check') {
 
