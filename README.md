@@ -1440,17 +1440,7 @@ Example image tags:
 
 ---
 
-## 7. Development Deployment
-
-Shows the application successfully deployed in the Development environment.
-
-<p align="center">
-    <img src="docs/images/dev-deployment.png" alt="Development Deployment" width="1000"/>
-</p>
-
----
-
-## 8. Production Deployment
+## 7. Production Deployment
 
 Shows the application successfully deployed in the Production environment after manual approval.
 
@@ -1460,7 +1450,7 @@ Shows the application successfully deployed in the Production environment after 
 
 ---
 
-## 9. Rollback Execution
+## 8. Rollback Execution
 
 Illustrates the rollback process using an immutable Docker image version.
 
@@ -1477,7 +1467,7 @@ The screenshot demonstrates:
 
 ---
 
-## 10. Docker Image Management
+## 9. Docker Image Management
 
 Demonstrates Docker image optimization and resource cleanup after successful deployments.
 
@@ -1490,12 +1480,13 @@ Highlights:
 - Reduced Disk Usage
 
 <p align="center">
-    <img src="docs/images/docker-cleanup.png" alt="Docker Cleanup" width="1000"/>
+    <img src="docs/images/before-cleanup.png" alt="Docker Cleanup" width="1000"/>
+    <img src="docs/images/after-cleanup.png" alt="Docker Cleanup" width="1000"/>
 </p>
 
 ---
 
-## 11. Health Check Validation
+## 10. Health Check Validation
 
 Shows successful application health verification after deployment.
 
@@ -1508,10 +1499,6 @@ Example response:
     "version": "1.0"
 }
 ```
-
-<p align="center">
-    <img src="docs/images/health-check.png" alt="Health Check" width="1000"/>
-</p>
 
 # 🚀 Future Enhancements
 
